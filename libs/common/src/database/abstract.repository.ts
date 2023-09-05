@@ -1,6 +1,7 @@
+import { Logger, NotFoundException } from '@nestjs/common';
 import { FilterQuery, Model, Types, UpdateQuery } from 'mongoose';
 import { AbstractDocument } from './abstract.schema';
-import { Logger, NotFoundException } from '@nestjs/common';
+import { CreateIndexesOptions } from 'mongodb';
 
 export abstract class AbstractRepository<TDocument extends AbstractDocument> {
   protected abstract readonly logger: Logger;
@@ -12,48 +13,46 @@ export abstract class AbstractRepository<TDocument extends AbstractDocument> {
       ...document,
       _id: new Types.ObjectId(),
     });
-    return (await createdDocument.save()).toJSON() as undefined as TDocument;
+    return (await createdDocument.save()).toJSON() as unknown as TDocument;
   }
 
   async findOne(filterQuery: FilterQuery<TDocument>): Promise<TDocument> {
     const document = await this.model.findOne(filterQuery, {}, { lean: true });
 
     if (!document) {
-      this.logger.warn(
-        'Document not found with this filterQuery.',
-        filterQuery,
-      );
+      this.logger.warn('Document not found with filterQuery', filterQuery);
       throw new NotFoundException('Document not found.');
     }
 
-    return document as TDocument;
+    return document;
   }
 
   async findOneAndUpdate(
     filterQuery: FilterQuery<TDocument>,
     update: UpdateQuery<TDocument>,
-  ): Promise<TDocument> {
+  ) {
     const document = await this.model.findOneAndUpdate(filterQuery, update, {
       lean: true,
       new: true,
     });
 
     if (!document) {
-      this.logger.warn(
-        'Document not found with this filterQuery.',
-        filterQuery,
-      );
+      this.logger.warn('Document not found with filterQuery', filterQuery);
       throw new NotFoundException('Document not found.');
     }
 
-    return document as TDocument;
+    return document;
   }
 
   async find(filterQuery: FilterQuery<TDocument>) {
-    return await this.model.find(filterQuery, {}, { lean: true });
+    return this.model.find(filterQuery, {}, { lean: true });
   }
 
   async findOneAndDelete(filterQuery: FilterQuery<TDocument>) {
     return this.model.findOneAndDelete(filterQuery, { lean: true });
+  }
+
+  async createIndex(options: CreateIndexesOptions) {
+    return this.model.createIndexes(options as any);
   }
 }
